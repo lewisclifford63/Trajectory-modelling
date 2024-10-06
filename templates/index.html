@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Orbit Simulation</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f0f5;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            margin: 20px 0;
+            font-size: 2em;
+            color: #2c3e50;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-container, .slider-container {
+            margin: 20px 0;
+        }
+
+        .input-label, .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+            color: #2c3e50;
+        }
+
+        input[type="range"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 1em;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+        }
+
+        input[type="range"] {
+            background-color: #ecf0f1;
+        }
+
+        input[type="number"] {
+            background-color: #f9f9f9;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        #plot-container {
+            width: 100%;
+            max-width: 800px;
+            height: 500px;
+            margin: 30px auto;
+            background-color: #ecf0f1;
+            border-radius: 8px;
+            border: 2px solid #bdc3c7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        img {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin: -30px 0 0 -30px;
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>3D Orbit Simulation</h1>
+
+        <!-- Input for Black Hole Mass -->
+        <div class="slider-container">
+            <div class="slider-label">
+                <span>Black Hole Mass (x10<sup>30</sup> kg):</span>
+                <span id="bh-mass-value">1.989</span>
+            </div>
+            <input type="range" id="bh-mass-slider" min="0.5" max="10" step="0.01" value="1.989" />
+        </div>
+
+        <!-- Input for Initial Position -->
+        <div class="input-container">
+            <div class="input-label">
+                <span>Initial Position (x, y, z in meters):</span>
+            </div>
+            <input type="number" id="position-x" value="1.5e11" placeholder="x (m)" />
+            <input type="number" id="position-y" value="0" placeholder="y (m)" />
+            <input type="number" id="position-z" value="0" placeholder="z (m)" />
+        </div>
+
+        <!-- Input for Initial Velocity -->
+        <div class="input-container">
+            <div class="input-label">
+                <span>Initial Velocity (vx, vy, vz in m/s):</span>
+            </div>
+            <input type="number" id="velocity-x" value="0" placeholder="vx (m/s)" />
+            <input type="number" id="velocity-y" value="3e4" placeholder="vy (m/s)" />
+            <input type="number" id="velocity-z" value="0" placeholder="vz (m/s)" />
+        </div>
+
+        <!-- Button to Start Animation -->
+        <button id="play-button">Play</button>
+
+        <!-- Loading spinner -->
+        <div class="spinner" id="loading-spinner"></div>
+
+        <!-- Placeholder GIF that will be displayed on page load -->
+        <div id="plot-container">
+            <img id="plot-image" src="static/animation.gif" alt="Orbit Plot" />
+        </div>
+    </div>
+
+    <script>
+        const bhMassSlider = document.getElementById('bh-mass-slider');
+        const positionXInput = document.getElementById('position-x');
+        const positionYInput = document.getElementById('position-y');
+        const positionZInput = document.getElementById('position-z');
+        const velocityXInput = document.getElementById('velocity-x');
+        const velocityYInput = document.getElementById('velocity-y');
+        const velocityZInput = document.getElementById('velocity-z');
+        const playButton = document.getElementById('play-button');
+        const plotImage = document.getElementById('plot-image');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        let frames = [];
+        let frameIndex = 0;
+
+        // Show spinner while loading new animation
+        function showSpinner() {
+            loadingSpinner.style.display = 'block';
+        }
+
+        // Hide spinner once loading is done
+        function hideSpinner() {
+            loadingSpinner.style.display = 'none';
+        }
+
+        // Collect input values and prepare the data to be sent to the backend
+        function updateValues() {
+            return {
+                bh_mass: bhMassSlider.value,
+                position: [parseFloat(positionXInput.value), parseFloat(positionYInput.value), parseFloat(positionZInput.value)],
+                velocity: [parseFloat(velocityXInput.value), parseFloat(velocityYInput.value), parseFloat(velocityZInput.value)]
+            };
+        }
+
+        // Send the input data to the Flask backend and start the animation
+        function startAnimation() {
+            showSpinner();
+
+            fetch('/start_animation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateValues())
+            })
+            .then(response => response.json())
+            .then(data => {
+                frames = data.frames;
+                frameIndex = 0;
+                hideSpinner();
+                playAnimation();
+            });
+        }
+
+        // Display each frame of the new animation in sequence
+        function playAnimation() {
+            if (frameIndex < frames.length) {
+                plotImage.src = "data:image/png;base64," + frames[frameIndex];
+                frameIndex++;
+                setTimeout(playAnimation, 100);  // Play next frame after 100ms
+            }
+        }
+
+        // Add event listener to the Play button
+        playButton.addEventListener('click', startAnimation);
+    </script>
+
+</body>
+</html>
