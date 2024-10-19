@@ -22,7 +22,7 @@ You can customize the following parameters directly in the `plot_orbit.py` scrip
 
 ## Output
 
-When you run the `plot_orbit.py` script, you will see a 3D plot of the orbit simulation. The plot shows:
+When you run the `trajectory-animation.py` script, you will see a 3D plot of the orbit simulation. The plot shows:
 - The **blue line** representing the trajectory of the planet.
 - The **red marker** showing the planet's current position.
 - A **black marker** representing the black hole.
